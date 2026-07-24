@@ -178,6 +178,7 @@ namespace PizzaOnTop.Player
         public void TriggerJumpVisual()
         {
             SetSafeTrigger(JumpTriggerParam);
+            ChangeAnimationState(jumpClipName); // Instant jump animation playback!
 
             if (useSquashAndStretch)
             {

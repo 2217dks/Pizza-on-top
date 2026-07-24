@@ -10,9 +10,8 @@ namespace PizzaOnTop.Environment
 
         [Header("120° Free Rotation & Soft Resistance Physics")]
         [SerializeField] private bool allowFull360TopAnchor = true;  // Unconstrained 360° top ceiling anchor!
-        [SerializeField] private float freeRotationAngle = 60f;      // 120° total free arc (-60° to +60°) with ZERO resistance!
-        [SerializeField] private float maxOverBendAngle = 135f;      // Allows bending further up to +/-135° under load!
-        [SerializeField] private float minorResistanceTorque = 4f;    // Light resistance beyond 60 degrees
+        [SerializeField] private float freeRotationAngle = 60f;      // 120° total free arc (-60° to +60°)
+        [SerializeField] private float minorResistanceTorque = 4f;    // Light motor torque resistance
         [SerializeField] private float segmentMass = 0.6f;
         [SerializeField] private float handleMass = 1.6f;            // Taut bottom handle weight
         [SerializeField] private float segmentGravityScale = 2.5f;
@@ -86,10 +85,10 @@ namespace PizzaOnTop.Environment
                     }
                     else
                     {
-                        // Inner joints: Free -60° to +60° rotation (120° arc), extending to +/-135° with minor resistance!
+                        // Inner joints: Free rotation arc defined by freeRotationAngle (-60° to +60°)
                         JointAngleLimits2D limits = new JointAngleLimits2D();
-                        limits.min = -maxOverBendAngle;
-                        limits.max = maxOverBendAngle;
+                        limits.min = -freeRotationAngle;
+                        limits.max = freeRotationAngle;
                         hinge.limits = limits;
                         hinge.useLimits = true;
 

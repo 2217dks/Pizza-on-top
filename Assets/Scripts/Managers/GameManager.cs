@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -25,10 +26,18 @@ namespace PizzaOnTop.Managers
         [SerializeField] private float maxPizzaHeat = 100f;
         public float CurrentPizzaHeat { get; private set; }
 
+        [Header("Key & Gun Weapon Tracking")]
+        public bool HasSpecialKey { get; set; } = false;
+        public bool IsGunUnlocked { get; set; } = false;
+
         public GameState CurrentState { get; private set; } = GameState.Playing;
 
         public event Action<GameState> OnGameStateChanged;
         public event Action<int> OnFloorChanged;
+        public event Action<bool> OnKeyCollected;
+
+        // Persistent Level State Tracking across Scene Loads
+        private readonly HashSet<string> brokenPlatformIDs = new HashSet<string>();
 
         private void Awake()
         {
@@ -87,6 +96,32 @@ namespace PizzaOnTop.Managers
         public int GetCurrentFloor() => currentFloorIndex;
         public int GetTotalFloors() => totalFloors;
 
+        // --- Key & Weapon Collectible System ---
+        public void CollectKey()
+        {
+            HasSpecialKey = true;
+            IsGunUnlocked = true; // Unlocks the gun for subsequent floors / boss fight!
+            Debug.Log("[GameManager] Special Key Collected! Gun Weapon Unlocked!");
+            OnKeyCollected?.Invoke(true);
+        }
+
+        // --- Persistent Broken Platform Traps Tracking ---
+        public bool IsPlatformBroken(string platformID)
+        {
+            if (string.IsNullOrEmpty(platformID)) return false;
+            return brokenPlatformIDs.Contains(platformID);
+        }
+
+        public void MarkPlatformBroken(string platformID)
+        {
+            if (string.IsNullOrEmpty(platformID)) return;
+            if (!brokenPlatformIDs.Contains(platformID))
+            {
+                brokenPlatformIDs.Add(platformID);
+                Debug.Log($"[GameManager] Platform '{platformID}' permanently marked as broken across scenes!");
+            }
+        }
+
         private void HandleTimeExpired()
         {
             SetState(GameState.GameOver);
@@ -102,11 +137,16 @@ namespace PizzaOnTop.Managers
         {
             currentFloorIndex = 1;
             CurrentPizzaHeat = maxPizzaHeat;
+            HasSpecialKey = false;
+            IsGunUnlocked = false;
+            brokenPlatformIDs.Clear(); // Reset broken trap states on full new game restart
+
             if (TimerManager.Instance != null)
             {
                 TimerManager.Instance.ResetTimer();
                 TimerManager.Instance.StartTimer();
             }
+
             SetState(GameState.Playing);
             SceneManager.LoadScene("Floor_01");
         }

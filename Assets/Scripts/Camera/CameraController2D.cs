@@ -4,20 +4,37 @@ namespace PizzaOnTop.CameraSystem
 {
     public class CameraController2D : MonoBehaviour
     {
+        public static CameraController2D Instance { get; private set; }
+
         [Header("Target & Offset")]
         [SerializeField] private Transform target;
-        [SerializeField] private Vector3 offset = new Vector3(0f, 1.5f, -10f);
-        [SerializeField] private float smoothTime = 0.2f;
+        [SerializeField] private Vector3 offset = new Vector3(0f, 0f, -10f);
+        [SerializeField] private float smoothTime = 0.25f;
 
-        [Header("Camera Bounding (Optional)")]
-        [SerializeField] private bool useBounds = false;
-        [SerializeField] private Vector2 minBounds = new Vector2(-20f, 0f);
-        [SerializeField] private Vector2 maxBounds = new Vector2(20f, 30f);
+        [Header("Vertical Lock Options")]
+        [SerializeField] private bool lockVertical = true;
+        [SerializeField] private float fixedCameraY = 0f;
+        [SerializeField] private bool useInitialYAsFixed = true;
+
+        [Header("Horizontal Camera Bounding (Optional)")]
+        [SerializeField] private bool useHorizontalBounds = false;
+        [SerializeField] private float minXBounds = -20f;
+        [SerializeField] private float maxXBounds = 20f;
 
         private Vector3 currentVelocity = Vector3.zero;
 
+        private void Awake()
+        {
+            if (Instance == null) Instance = this;
+        }
+
         private void Start()
         {
+            if (useInitialYAsFixed)
+            {
+                fixedCameraY = transform.position.y;
+            }
+
             FindPlayerTarget();
         }
 
@@ -32,15 +49,25 @@ namespace PizzaOnTop.CameraSystem
             // Target position with offset
             Vector3 targetPos = target.position + offset;
 
-            // Apply level bounds if enabled
-            if (useBounds)
+            // Lock vertical Y axis if enabled
+            if (lockVertical)
             {
-                targetPos.x = Mathf.Clamp(targetPos.x, minBounds.x, maxBounds.x);
-                targetPos.y = Mathf.Clamp(targetPos.y, minBounds.y, maxBounds.y);
+                targetPos.y = fixedCameraY;
             }
 
-            // Smooth camera dampening
+            // Apply horizontal bounds if enabled
+            if (useHorizontalBounds)
+            {
+                targetPos.x = Mathf.Clamp(targetPos.x, minXBounds, maxXBounds);
+            }
+
+            // Smooth horizontal camera dampening
             transform.position = Vector3.SmoothDamp(transform.position, targetPos, ref currentVelocity, smoothTime);
+        }
+
+        public void ResetCameraVelocity()
+        {
+            currentVelocity = Vector3.zero;
         }
 
         private void FindPlayerTarget()

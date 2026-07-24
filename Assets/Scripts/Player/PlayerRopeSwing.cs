@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using PizzaOnTop.Environment;
+using PizzaOnTop.CameraSystem;
 
 namespace PizzaOnTop.Player
 {
@@ -82,7 +83,7 @@ namespace PizzaOnTop.Player
             currentSwingInput = 0f;
             if (playerController.IsOnRope)
             {
-                bool releasePressed = !isHoldingGrab || (keyboard != null && (keyboard.spaceKey.wasPressedThisFrame || keyboard.wKey.wasPressedThisFrame));
+                bool releasePressed = !isHoldingGrab || (keyboard != null && (keyboard.spaceKey.wasPressedThisFrame || keyboard.upArrowKey.wasPressedThisFrame));
                 if (releasePressed)
                 {
                     DetachFromRope();
@@ -159,6 +160,12 @@ namespace PizzaOnTop.Player
 
             Vector2 bodyOffsetFromFeet = GetCenterPosition() - (Vector2)transform.position;
             transform.position = (Vector2)segment.transform.position - bodyOffsetFromFeet;
+
+            // Reset camera velocity on position snap to eliminate camera jitter!
+            if (CameraController2D.Instance != null)
+            {
+                CameraController2D.Instance.ResetCameraVelocity();
+            }
 
             if (ropeSegmentRB != null)
             {

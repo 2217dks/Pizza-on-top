@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using PizzaOnTop.Environment;
 
 namespace PizzaOnTop.Player
 {
@@ -11,13 +12,17 @@ namespace PizzaOnTop.Player
         [SerializeField] private float moveSpeed = 10f;
         [SerializeField] private float acceleration = 70f;
         [SerializeField] private float deceleration = 50f;
-        [SerializeField] private float airControlMultiplier = 0.75f;
+        [SerializeField] private float airControlMultiplier = 0.85f;
 
-        [Header("Jump Physics (Snappy & Fast)")]
+        [Header("Hollow Knight Responsive Jump Physics")]
         [SerializeField] private float jumpForce = 17.5f;
         [SerializeField] private float gravityScale = 3.2f;
         [SerializeField] private bool enableVariableJumpHeight = true;
         [SerializeField] private float jumpCutMultiplier = 0.4f;
+
+        [Header("Juice Polish: Coyote & Buffer")]
+        [SerializeField] private float coyoteTime = 0.12f;      // Grace period to jump after walking off ledges
+        [SerializeField] private float jumpBufferTime = 0.15f;  // Queues jump before landing for instant corner jumps!
 
         [Header("Debug Controls")]
         [SerializeField] private KeyCode debugDeathKey = KeyCode.K;
@@ -34,6 +39,10 @@ namespace PizzaOnTop.Player
         private bool isGrounded;
         private bool isJumping;
 
+        // Polish Timers
+        private float coyoteCounter;
+        private float jumpBufferCounter;
+
         // GC-Free Physics Buffer & Contact Filter
         private readonly Collider2D[] groundOverlapResults = new Collider2D[8];
         private ContactFilter2D groundFilter;
@@ -49,6 +58,18 @@ namespace PizzaOnTop.Player
             {
                 RB.constraints = RigidbodyConstraints2D.FreezeRotation;
                 RB.gravityScale = gravityScale;
+                RB.interpolation = RigidbodyInterpolation2D.Interpolate;
+            }
+
+            // Zero friction physics material prevents wall catching when jumping next to blocks
+            if (PlayerCollider != null && PlayerCollider.sharedMaterial == null)
+            {
+                PhysicsMaterial2D zeroFrictionMat = new PhysicsMaterial2D("ZeroWallFriction")
+                {
+                    friction = 0f,
+                    bounciness = 0f
+                };
+                PlayerCollider.sharedMaterial = zeroFrictionMat;
             }
 
             // Setup contact filter
@@ -95,42 +116,57 @@ namespace PizzaOnTop.Player
                 catch { }
             }
 
-            // 2. Perform Ground Check
+            // 2. Perform Ground Check & Coyote Time
             CheckIsGrounded();
-            if (isGrounded && RB.linearVelocity.y <= 0.1f)
+
+            if (isGrounded)
             {
-                isJumping = false;
+                coyoteCounter = coyoteTime;
+                if (RB.linearVelocity.y <= 0.1f)
+                {
+                    isJumping = false;
+                }
+            }
+            else
+            {
+                coyoteCounter -= Time.deltaTime;
             }
 
-            // 3. Jump Input
+            // 3. Jump Input & Jump Buffer (Space or Up Arrow)
             bool jumpPressedThisFrame = false;
             bool jumpReleasedThisFrame = false;
 
             if (keyboard != null)
             {
-                if (keyboard.spaceKey.wasPressedThisFrame || keyboard.wKey.wasPressedThisFrame || keyboard.upArrowKey.wasPressedThisFrame)
-                {
-                    jumpPressedThisFrame = true;
-                }
-                if (keyboard.spaceKey.wasReleasedThisFrame || keyboard.wKey.wasReleasedThisFrame || keyboard.upArrowKey.wasReleasedThisFrame)
-                {
-                    jumpReleasedThisFrame = true;
-                }
+                if (keyboard.spaceKey.wasPressedThisFrame || keyboard.upArrowKey.wasPressedThisFrame) jumpPressedThisFrame = true;
+                if (keyboard.spaceKey.wasReleasedThisFrame || keyboard.upArrowKey.wasReleasedThisFrame) jumpReleasedThisFrame = true;
             }
             else
             {
                 try
                 {
-                    if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) jumpPressedThisFrame = true;
-                    if (Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.W) || Input.GetKeyUp(KeyCode.UpArrow)) jumpReleasedThisFrame = true;
+                    if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.UpArrow)) jumpPressedThisFrame = true;
+                    if (Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.UpArrow)) jumpReleasedThisFrame = true;
                 }
                 catch { }
             }
 
-            // Execute Jump
-            if (jumpPressedThisFrame && (isGrounded || IsOnRope))
+            // Update Jump Buffer Timer
+            if (jumpPressedThisFrame)
+            {
+                jumpBufferCounter = jumpBufferTime;
+            }
+            else
+            {
+                jumpBufferCounter -= Time.deltaTime;
+            }
+
+            // Execute Jump (Instant response when landing or during Coyote Time!)
+            if (jumpBufferCounter > 0f && (coyoteCounter > 0f || IsOnRope))
             {
                 ExecuteJump();
+                jumpBufferCounter = 0f;
+                coyoteCounter = 0f;
             }
 
             // Variable Jump Cut
@@ -219,6 +255,13 @@ namespace PizzaOnTop.Player
             if (spawnObj != null)
             {
                 transform.position = spawnObj.transform.position;
+            }
+
+            // Auto-reset all crumbling tilemaps on respawn!
+            CrumblingTilemap2D[] tilemaps = FindObjectsByType<CrumblingTilemap2D>(FindObjectsSortMode.None);
+            foreach (var tm in tilemaps)
+            {
+                tm.ResetAllCrumblingTiles();
             }
 
             if (RB != null) RB.linearVelocity = Vector2.zero;
