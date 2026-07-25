@@ -15,8 +15,8 @@ namespace PizzaOnTop.Player
         [Header("Inertia & Physics Swing")]
         [SerializeField] private float momentumTransferFactor = 0.85f;
         [SerializeField] private float swingForce = 180f;
-        [SerializeField] private float launchInertiaMultiplier = 1.1f;
-        [SerializeField] private float maxLaunchSpeed = 18f;
+        [SerializeField] private float launchInertiaMultiplier = 1.05f;
+        [SerializeField] private float maxLaunchSpeed = 16f;             // Hard speed ceiling on launch
         [SerializeField] private float ropeDetachCooldown = 0.3f;
 
         private PlayerController2D playerController;
@@ -169,7 +169,7 @@ namespace PizzaOnTop.Player
 
             if (ropeSegmentRB != null)
             {
-                ropeSegmentRB.linearVelocity += incomingVelocity * momentumTransferFactor;
+                ropeSegmentRB.linearVelocity += Vector2.ClampMagnitude(incomingVelocity * momentumTransferFactor, 12f);
             }
 
             if (playerHingeJoint == null)
@@ -194,7 +194,9 @@ namespace PizzaOnTop.Player
             Vector2 launchVelocity = Vector2.zero;
             if (ropeSegmentRB != null)
             {
-                launchVelocity = ropeSegmentRB.linearVelocity * launchInertiaMultiplier;
+                // Clamp rope segment velocity before applying inertia multiplier to prevent super launches!
+                Vector2 clampedRopeVel = Vector2.ClampMagnitude(ropeSegmentRB.linearVelocity, maxLaunchSpeed);
+                launchVelocity = clampedRopeVel * launchInertiaMultiplier;
             }
             else
             {
@@ -212,7 +214,7 @@ namespace PizzaOnTop.Player
 
             launchVelocity = Vector2.ClampMagnitude(launchVelocity, maxLaunchSpeed);
             playerController.SetVelocity(launchVelocity);
-            Debug.Log($"[PlayerRopeSwing] Released rope with launch velocity: {launchVelocity}");
+            Debug.Log($"[PlayerRopeSwing] Released rope with clean launch velocity: {launchVelocity}");
         }
 
         private void OnDrawGizmosSelected()

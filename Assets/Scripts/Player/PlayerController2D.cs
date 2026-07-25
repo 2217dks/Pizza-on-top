@@ -19,10 +19,13 @@ namespace PizzaOnTop.Player
         [SerializeField] private float gravityScale = 3.2f;
         [SerializeField] private bool enableVariableJumpHeight = true;
         [SerializeField] private float jumpCutMultiplier = 0.4f;
+        [SerializeField] private float maxFallSpeed = 25f;       // Hard cap on downward terminal velocity
+        [SerializeField] private float maxUpwardSpeed = 20f;     // Hard cap on upward launch velocity!
 
-        [Header("Juice Polish: Coyote & Buffer")]
+        [Header("Juice Polish: Coyote, Buffer & Death Delay")]
         [SerializeField] private float coyoteTime = 0.12f;      // Grace period to jump after walking off ledges
         [SerializeField] private float jumpBufferTime = 0.15f;  // Queues jump before landing for instant corner jumps!
+        [SerializeField] private float respawnDelayTime = 1.0f; // Delay duration between death and teleporting back to spawn!
 
         [Header("Debug Controls")]
         [SerializeField] private KeyCode debugDeathKey = KeyCode.K;
@@ -35,6 +38,9 @@ namespace PizzaOnTop.Player
         public bool IsOnRope { get; set; } = false;
         public bool IsDead { get; set; } = false;
 
+        // External Wind Force Integration
+        public Vector2 ActiveWindVelocity { get; set; } = Vector2.zero;
+
         private float moveInput;
         private bool isGrounded;
         private bool isJumping;
@@ -46,7 +52,6 @@ namespace PizzaOnTop.Player
         // GC-Free Physics Buffer & Contact Filter
         private readonly Collider2D[] groundOverlapResults = new Collider2D[8];
         private ContactFilter2D groundFilter;
-        private readonly WaitForSeconds respawnDelay = new WaitForSeconds(0.3f);
 
         private void Awake()
         {
@@ -181,14 +186,23 @@ namespace PizzaOnTop.Player
         {
             if (IsDead || IsOnRope || RB == null) return;
 
-            float targetSpeed = moveInput * moveSpeed;
+            // Combine player input speed with active horizontal wind force
+            float targetSpeed = (moveInput * moveSpeed) + ActiveWindVelocity.x;
             float currentX = RB.linearVelocity.x;
 
             float accel = isGrounded ? (Mathf.Abs(targetSpeed) > 0.01f ? acceleration : deceleration)
                                      : (acceleration * airControlMultiplier);
 
             float newX = Mathf.MoveTowards(currentX, targetSpeed, accel * Time.fixedDeltaTime);
-            RB.linearVelocity = new Vector2(newX, RB.linearVelocity.y);
+            float newY = RB.linearVelocity.y + ActiveWindVelocity.y * Time.fixedDeltaTime;
+
+            // Strict Vertical Velocity Ceiling & Terminal Fall Speed Clamp!
+            newY = Mathf.Clamp(newY, -maxFallSpeed, maxUpwardSpeed);
+
+            RB.linearVelocity = new Vector2(newX, newY);
+
+            // Clear frame wind velocity
+            ActiveWindVelocity = Vector2.zero;
         }
 
         private void CheckIsGrounded()
@@ -236,20 +250,22 @@ namespace PizzaOnTop.Player
 
         public void RespawnPlayer()
         {
+            if (IsDead) return;
             StartCoroutine(RoutineRespawn());
         }
 
         private IEnumerator RoutineRespawn()
         {
+            IsDead = true;
             if (PlayerAnim != null)
             {
                 PlayerAnim.TriggerHurtVisual();
             }
 
-            IsDead = true;
             if (RB != null) RB.linearVelocity = Vector2.zero;
 
-            yield return respawnDelay;
+            // Wait for respawnDelayTime so player sees death animation before teleporting back!
+            yield return new WaitForSeconds(respawnDelayTime);
 
             GameObject spawnObj = GameObject.FindWithTag("SpawnPoint");
             if (spawnObj != null)

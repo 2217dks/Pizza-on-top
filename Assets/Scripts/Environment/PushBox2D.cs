@@ -82,7 +82,7 @@ namespace PizzaOnTop.Environment
             IsCarried = true;
             if (RB != null)
             {
-                RB.isKinematic = true;
+                RB.bodyType = RigidbodyType2D.Kinematic;
                 RB.linearVelocity = Vector2.zero;
             }
             if (BoxCollider != null)
@@ -105,7 +105,7 @@ namespace PizzaOnTop.Environment
 
             if (RB != null)
             {
-                RB.isKinematic = false;
+                RB.bodyType = RigidbodyType2D.Dynamic;
                 float facingDir = (carrierSpriteRenderer != null && carrierSpriteRenderer.flipX) ? -1f : 1f;
                 RB.linearVelocity = new Vector2(facingDir * throwForceX, throwForceY);
             }

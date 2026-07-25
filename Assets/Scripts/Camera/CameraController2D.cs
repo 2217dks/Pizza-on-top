@@ -11,10 +11,14 @@ namespace PizzaOnTop.CameraSystem
         [SerializeField] private Vector3 offset = new Vector3(0f, 0f, -10f);
         [SerializeField] private float smoothTime = 0.25f;
 
-        [Header("Vertical Lock Options")]
+        [Header("Floor Camera Snapping (16 Units Height Per Floor)")]
+        [SerializeField] private bool snapToFloorHeight = true;  // Automatically centers camera on current floor!
+        [SerializeField] private float floorHeight = 16f;        // Exact world height per floor (Camera Ortho Size 8)
+        [SerializeField] private float baseFloorCenterY = 8f;     // Center Y position of Floor 1
+
+        [Header("Manual Vertical Lock Fallback")]
         [SerializeField] private bool lockVertical = true;
-        [SerializeField] private float fixedCameraY = 0f;
-        [SerializeField] private bool useInitialYAsFixed = true;
+        [SerializeField] private float fixedCameraY = 8f;
 
         [Header("Horizontal Camera Bounding (Optional)")]
         [SerializeField] private bool useHorizontalBounds = false;
@@ -30,12 +34,11 @@ namespace PizzaOnTop.CameraSystem
 
         private void Start()
         {
-            if (useInitialYAsFixed)
-            {
-                fixedCameraY = transform.position.y;
-            }
-
             FindPlayerTarget();
+            if (target != null && snapToFloorHeight)
+            {
+                UpdateTargetFloorY();
+            }
         }
 
         private void LateUpdate()
@@ -46,23 +49,35 @@ namespace PizzaOnTop.CameraSystem
                 if (target == null) return;
             }
 
-            // Target position with offset
             Vector3 targetPos = target.position + offset;
 
-            // Lock vertical Y axis if enabled
-            if (lockVertical)
+            if (snapToFloorHeight)
+            {
+                // Calculate current floor index from player Y position and snap camera center!
+                int currentFloorIndex = Mathf.FloorToInt(target.position.y / floorHeight);
+                targetPos.y = (currentFloorIndex * floorHeight) + baseFloorCenterY;
+            }
+            else if (lockVertical)
             {
                 targetPos.y = fixedCameraY;
             }
 
-            // Apply horizontal bounds if enabled
             if (useHorizontalBounds)
             {
                 targetPos.x = Mathf.Clamp(targetPos.x, minXBounds, maxXBounds);
             }
 
-            // Smooth horizontal camera dampening
+            // Smooth horizontal and vertical camera dampening
             transform.position = Vector3.SmoothDamp(transform.position, targetPos, ref currentVelocity, smoothTime);
+        }
+
+        public void UpdateTargetFloorY()
+        {
+            if (target != null && snapToFloorHeight)
+            {
+                int currentFloorIndex = Mathf.FloorToInt(target.position.y / floorHeight);
+                fixedCameraY = (currentFloorIndex * floorHeight) + baseFloorCenterY;
+            }
         }
 
         public void ResetCameraVelocity()

@@ -1,22 +1,20 @@
 using System.Collections;
 using UnityEngine;
-using PizzaOnTop.Player;
 
 namespace PizzaOnTop.Environment
 {
-    [RequireComponent(typeof(LineRenderer))]
     public class LaserEmitter2D : MonoBehaviour
     {
-        [Header("Laser Physics Settings")]
-        [SerializeField] private float maxDistance = 25f;
-        [SerializeField] private LayerMask obstacleMask;
+        [Header("Laser Nozzle & Prefab Settings")]
+        [SerializeField] private GameObject laserBeamPrefab;                      // Laser beam projectile prefab
+        [SerializeField] private Vector2 nozzleOffset = new Vector2(0.5f, 0f);     // Nozzle tip position offset
 
-        [Header("Pulsing / Rotation Options")]
-        [SerializeField] private bool isPulsing = false;
-        [SerializeField] private float activeDuration = 2.0f;
-        [SerializeField] private float inactiveDuration = 1.5f;
-        [SerializeField] private bool isRotating = false;
-        [SerializeField] private float rotationSpeed = 35f;
+        [Header("Shooting Interval & Target Tracking")]
+        [SerializeField] private float fireRateInterval = 1.2f;                   // Time between laser shots (sec)
+        [SerializeField] private bool targetPlayer = true;                         // Rotates nozzle to track player
+        [SerializeField] private float targetingRange = 25f;                       // Max range to detect and fire at player
+        [SerializeField] private float rotationSpeed = 90f;                        // Aim rotation speed
+        [SerializeField] private bool requirePlayerInRangeToFire = true;           // ONLY shoots when player is in range!
 
         [Header("Destructible Machine Settings")]
         [SerializeField] private bool isDestructible = true;
@@ -25,88 +23,81 @@ namespace PizzaOnTop.Environment
 
         public bool IsBeamActive { get; private set; } = true;
 
-        private LineRenderer lineRenderer;
         private SpriteRenderer spriteRenderer;
         private Collider2D machineCollider;
         private int currentHealth;
         private bool isDestroyed = false;
+        private Transform playerTransform;
+        private float nextFireTime;
 
         private void Awake()
         {
-            lineRenderer = GetComponent<LineRenderer>();
             spriteRenderer = GetComponent<SpriteRenderer>();
             machineCollider = GetComponent<Collider2D>();
             currentHealth = maxHealth;
-
-            if (lineRenderer != null)
-            {
-                lineRenderer.positionCount = 2;
-            }
         }
 
         private void Start()
         {
-            if (isPulsing)
-            {
-                StartCoroutine(RoutinePulseLaser());
-            }
+            GameObject pObj = GameObject.FindWithTag("Player");
+            if (pObj != null) playerTransform = pObj.transform;
         }
 
         private void Update()
         {
             if (isDestroyed) return;
 
-            if (isRotating)
+            bool isPlayerInArea = IsPlayerInTargetingRange();
+
+            // 1. Aim Nozzle Towards Player when in range
+            if (targetPlayer && isPlayerInArea)
             {
-                transform.Rotate(Vector3.forward, rotationSpeed * Time.deltaTime);
+                AimAtPlayer();
             }
 
-            if (IsBeamActive)
+            // 2. Fire Laser Beam when player is in targeting range!
+            if (Time.time >= nextFireTime)
             {
-                UpdateLaserBeam();
-            }
-            else
-            {
-                if (lineRenderer != null) lineRenderer.enabled = false;
-            }
-        }
-
-        private void UpdateLaserBeam()
-        {
-            if (lineRenderer == null) return;
-
-            Vector2 origin = transform.position;
-            Vector2 direction = transform.right;
-
-            RaycastHit2D hit = Physics2D.Raycast(origin, direction, maxDistance, obstacleMask);
-            Vector2 endPoint = hit.collider != null ? hit.point : origin + direction * maxDistance;
-
-            lineRenderer.enabled = true;
-            lineRenderer.SetPosition(0, origin);
-            lineRenderer.SetPosition(1, endPoint);
-
-            // Check if laser beam hits player -> Trigger player death!
-            if (hit.collider != null && hit.collider.CompareTag("Player"))
-            {
-                PlayerController2D player = hit.collider.GetComponent<PlayerController2D>();
-                if (player != null && !player.IsDead)
+                if (!requirePlayerInRangeToFire || isPlayerInArea)
                 {
-                    Debug.Log("[LaserEmitter2D] Player touched laser beam! Respawning!");
-                    player.RespawnPlayer();
+                    FireLaserBeam();
+                    nextFireTime = Time.time + fireRateInterval;
                 }
             }
         }
 
-        private IEnumerator RoutinePulseLaser()
+        private bool IsPlayerInTargetingRange()
         {
-            while (!isDestroyed)
+            if (playerTransform == null)
             {
-                IsBeamActive = true;
-                yield return new WaitForSeconds(activeDuration);
-
-                IsBeamActive = false;
-                yield return new WaitForSeconds(inactiveDuration);
+                GameObject pObj = GameObject.FindWithTag("Player");
+                if (pObj != null) playerTransform = pObj.transform;
+                else return false;
             }
+
+            float dist = Vector2.Distance(transform.position, playerTransform.position);
+            return dist <= targetingRange;
+        }
+
+        private void AimAtPlayer()
+        {
+            if (playerTransform == null) return;
+
+            Vector2 dirToPlayer = (playerTransform.position - transform.position).normalized;
+            float targetAngle = Mathf.Atan2(dirToPlayer.y, dirToPlayer.x) * Mathf.Rad2Deg;
+
+            Quaternion targetRotation = Quaternion.AngleAxis(targetAngle, Vector3.forward);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+        }
+
+        public void FireLaserBeam()
+        {
+            if (laserBeamPrefab == null || isDestroyed) return;
+
+            Vector2 spawnPos = (Vector2)transform.position + (Vector2)(transform.rotation * nozzleOffset);
+            Instantiate(laserBeamPrefab, spawnPos, transform.rotation);
+
+            Debug.Log("[LaserEmitter2D] Fired targeted laser beam blast!");
         }
 
         public void TakeDamage(int damage = 1)
@@ -125,9 +116,6 @@ namespace PizzaOnTop.Environment
         public void DestroyMachine()
         {
             isDestroyed = true;
-            IsBeamActive = false;
-
-            if (lineRenderer != null) lineRenderer.enabled = false;
 
             if (destroyedSprite != null && spriteRenderer != null)
             {
@@ -137,10 +125,18 @@ namespace PizzaOnTop.Environment
             Debug.Log($"[LaserEmitter2D] Laser machine '{gameObject.name}' DESTROYED!");
         }
 
-        private void OnDrawGizmos()
+        private void OnDrawGizmosSelected()
         {
-            Gizmos.color = Color.red;
-            Gizmos.DrawRay(transform.position, transform.right * maxDistance);
+            Gizmos.color = Color.cyan;
+            Vector2 nozzlePos = (Vector2)transform.position + (Vector2)(transform.rotation * nozzleOffset);
+            Gizmos.DrawWireSphere(nozzlePos, 0.1f);
+            Gizmos.DrawRay(nozzlePos, transform.right * 3f);
+
+            if (targetPlayer)
+            {
+                Gizmos.color = Color.red;
+                Gizmos.DrawWireSphere(transform.position, targetingRange);
+            }
         }
     }
 }
