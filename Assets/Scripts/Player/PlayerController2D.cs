@@ -287,10 +287,15 @@ namespace PizzaOnTop.Player
             // Wait for respawnDelayTime so player sees death animation before teleporting back!
             yield return new WaitForSeconds(respawnDelayTime);
 
-            GameObject spawnObj = GameObject.FindWithTag("SpawnPoint");
-            if (spawnObj != null)
+            int currentFloor = Mathf.FloorToInt(transform.position.y / 16f);
+
+            if (SpawnPoint.All.TryGetValue(currentFloor, out SpawnPoint spawn))
             {
-                transform.position = spawnObj.transform.position;
+                transform.position = spawn.transform.position;
+            }
+            else
+            {
+                Debug.LogWarning($"No SpawnPoint found for floor {currentFloor}.");
             }
 
             // Auto-reset all crumbling tilemaps on respawn!

@@ -1,39 +1,46 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace PizzaOnTop.Environment
 {
     public class SpawnPoint : MonoBehaviour
     {
-        [SerializeField] private string spawnID = "default";
-        [SerializeField] private GameObject playerPrefab;          // Drag Player.prefab here for auto-spawning!
-        [SerializeField] private bool autoSpawnIfMissing = true;
+        public static readonly Dictionary<int, SpawnPoint> All = new();
 
-        public string SpawnID => spawnID;
+        [SerializeField] private int floorIndex;
+
+        [Header("Initial Spawn")]
+        [SerializeField] private GameObject playerPrefab;
+
+        public int FloorIndex => floorIndex;
+
+        private void Awake()
+        {
+            All[floorIndex] = this;
+        }
 
         private void Start()
         {
-            if (autoSpawnIfMissing)
+            // Spawn the player at Floor 0 if one doesn't already exist.
+            if (floorIndex != 0)
+                return;
+
+            if (GameObject.FindWithTag("Player") != null)
+                return;
+
+            if (playerPrefab == null)
             {
-                EnsurePlayerExists();
+                Debug.LogWarning("No Player Prefab assigned to the Floor 0 SpawnPoint.");
+                return;
             }
+
+            Instantiate(playerPrefab, transform.position, Quaternion.identity).name = "Player";
         }
 
-        public void EnsurePlayerExists()
+        private void OnDestroy()
         {
-            GameObject playerObj = GameObject.FindWithTag("Player");
-            if (playerObj == null && playerPrefab != null)
-            {
-                playerObj = Instantiate(playerPrefab, transform.position, Quaternion.identity);
-                playerObj.name = "Player";
-                Debug.Log($"[SpawnPoint] Automatically spawned Player prefab at '{spawnID}' ({transform.position})!");
-            }
-        }
-
-        private void OnDrawGizmosSelected()
-        {
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawWireSphere(transform.position, 0.5f);
-            Gizmos.DrawRay(transform.position, Vector3.up * 1f);
+            if (All.TryGetValue(floorIndex, out var spawn) && spawn == this)
+                All.Remove(floorIndex);
         }
     }
 }
