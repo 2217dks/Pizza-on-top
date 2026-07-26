@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 
 namespace PizzaOnTop.CameraSystem
@@ -10,6 +11,8 @@ namespace PizzaOnTop.CameraSystem
         [SerializeField] private Transform target;
         [SerializeField] private Vector3 offset = new Vector3(0f, 0f, -10f);
         [SerializeField] private float smoothTime = 0.25f;
+
+        [SerializeField] private TextMeshProUGUI floorsToGoText;
 
         [Header("Floor Camera Snapping (16 Units Height Per Floor)")]
         [SerializeField] private bool snapToFloorHeight = true;  // Automatically centers camera on current floor!
@@ -39,6 +42,7 @@ namespace PizzaOnTop.CameraSystem
             {
                 UpdateTargetFloorY();
             }
+            floorsToGoText.text = "6 floors to go!";
         }
 
         private void LateUpdate()
@@ -56,6 +60,7 @@ namespace PizzaOnTop.CameraSystem
                 // Calculate current floor index from player Y position and snap camera center!
                 int currentFloorIndex = Mathf.FloorToInt(target.position.y / floorHeight);
                 targetPos.y = (currentFloorIndex * floorHeight) + baseFloorCenterY;
+                floorsToGoText.text = (6 - currentFloorIndex).ToString() + " floors to go!";
             }
             else if (lockVertical)
             {
@@ -66,6 +71,7 @@ namespace PizzaOnTop.CameraSystem
             {
                 targetPos.x = Mathf.Clamp(targetPos.x, minXBounds, maxXBounds);
             }
+
 
             // Smooth horizontal and vertical camera dampening
             transform.position = Vector3.SmoothDamp(transform.position, targetPos, ref currentVelocity, smoothTime);
