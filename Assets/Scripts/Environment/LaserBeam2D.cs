@@ -12,6 +12,7 @@ namespace PizzaOnTop.Environment
 
         private Rigidbody2D rb;
         private Collider2D col;
+        private Vector2 lastPosition;
 
         private void Awake()
         {
@@ -22,7 +23,7 @@ namespace PizzaOnTop.Environment
 
         private void Start()
         {
-            // Auto destroy beam after beamLifetime seconds if it hits nothing
+            lastPosition = transform.position;
             Destroy(gameObject, beamLifetime);
 
             if (rb != null)
@@ -33,6 +34,25 @@ namespace PizzaOnTop.Environment
 
         private void FixedUpdate()
         {
+            // Continuous collision check between frames to prevent high-speed clipping through boxes or walls
+            Vector2 currentPosition = transform.position;
+            Vector2 delta = currentPosition - lastPosition;
+            float dist = delta.magnitude;
+
+            if (dist > 0.001f)
+            {
+                RaycastHit2D[] hits = Physics2D.LinecastAll(lastPosition, currentPosition);
+                foreach (var hit in hits)
+                {
+                    if (hit.collider != null && ProcessCollision(hit.collider))
+                    {
+                        return;
+                    }
+                }
+            }
+
+            lastPosition = currentPosition;
+
             // Velocity fallback if Rigidbody2D is missing or kinematic
             if (rb == null || rb.bodyType == RigidbodyType2D.Kinematic)
             {
@@ -42,10 +62,25 @@ namespace PizzaOnTop.Environment
 
         private void OnTriggerEnter2D(Collider2D other)
         {
-            // Ignore laser machine emitter itself
-            if (other.GetComponent<LaserEmitter2D>() != null) return;
+            ProcessCollision(other);
+        }
 
-            // 1. Hit Player -> Trigger Respawn Death and destroy beam!
+        private bool ProcessCollision(Collider2D other)
+        {
+            if (other == null || other.gameObject == gameObject) return false;
+
+            // Ignore laser machine emitter and wind fan trigger fields completely
+            if (other.GetComponent<LaserEmitter2D>() != null || other.GetComponent<WindFan2D>() != null) return false;
+
+            // 1. Hit PushBox -> Destroy laser beam on impact, protecting player taking cover behind it!
+            if (other.GetComponent<PushBox2D>() != null)
+            {
+                Debug.Log($"[LaserBeam2D] Beam hit PushBox '{other.gameObject.name}' and was blocked!");
+                Destroy(gameObject);
+                return true;
+            }
+
+            // 2. Hit Player -> Trigger Respawn Death and destroy beam!
             if (other.CompareTag("Player"))
             {
                 PlayerController2D player = other.GetComponent<PlayerController2D>();
@@ -55,15 +90,18 @@ namespace PizzaOnTop.Environment
                     player.RespawnPlayer();
                 }
                 Destroy(gameObject);
-                return;
+                return true;
             }
 
-            // 2. Hit Walls, Floors, Boxes, or Obstacles -> ONLY destroy the beam itself (leaves obstacles intact!)
+            // 3. Hit Walls, Floors, or other solid non-trigger obstacles -> destroy beam
             if (!other.isTrigger)
             {
                 Debug.Log($"[LaserBeam2D] Laser beam hit '{other.gameObject.name}' and destroyed itself!");
                 Destroy(gameObject);
+                return true;
             }
+
+            return false;
         }
     }
 }

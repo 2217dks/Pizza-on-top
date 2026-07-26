@@ -18,11 +18,16 @@ namespace PizzaOnTop.Environment
 
         private Transform carrierTransform;
         private SpriteRenderer carrierSpriteRenderer;
+        private Collider2D carrierCollider;
 
         private void Awake()
         {
             RB = GetComponent<Rigidbody2D>();
             BoxCollider = GetComponent<Collider2D>();
+            if (RB != null)
+            {
+                RB.constraints = RigidbodyConstraints2D.FreezeRotation;
+            }
         }
 
         private void Update()
@@ -78,6 +83,7 @@ namespace PizzaOnTop.Environment
         {
             carrierTransform = player;
             carrierSpriteRenderer = player.GetComponent<SpriteRenderer>();
+            carrierCollider = player.GetComponent<Collider2D>();
 
             IsCarried = true;
             if (RB != null)
@@ -85,9 +91,10 @@ namespace PizzaOnTop.Environment
                 RB.bodyType = RigidbodyType2D.Kinematic;
                 RB.linearVelocity = Vector2.zero;
             }
-            if (BoxCollider != null)
+            if (BoxCollider != null && carrierCollider != null)
             {
-                BoxCollider.enabled = false;
+                BoxCollider.enabled = true;
+                Physics2D.IgnoreCollision(BoxCollider, carrierCollider, true);
             }
 
             Debug.Log("[PushBox2D] Box picked up overhead!");
@@ -98,9 +105,9 @@ namespace PizzaOnTop.Environment
             if (!IsCarried) return;
 
             IsCarried = false;
-            if (BoxCollider != null)
+            if (BoxCollider != null && carrierCollider != null)
             {
-                BoxCollider.enabled = true;
+                Physics2D.IgnoreCollision(BoxCollider, carrierCollider, false);
             }
 
             if (RB != null)
@@ -112,6 +119,7 @@ namespace PizzaOnTop.Environment
 
             carrierTransform = null;
             carrierSpriteRenderer = null;
+            carrierCollider = null;
             Debug.Log("[PushBox2D] Box dropped / tossed!");
         }
     }

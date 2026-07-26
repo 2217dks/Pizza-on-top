@@ -1,12 +1,12 @@
 {
-    "dotnet.defaultSolution": "Pizza-on-top.slnx",
+    "dotnet.defaultSolution": "Pizza-on-top.sln",
     "dotnet.dotnetPath": "/usr/local/share/dotnet/dotnet",
-    "dotrush.roslyn.dotnetSdkDirectory": "/usr/local/share/dotnet/sdk/10.0.101",
+    "dotrush.roslyn.dotnetSdkDirectory": "/usr/local/share/dotnet/sdk/10.0.300",
     "dotrush.msbuildProperties": {
         "DefineConstants": "UNITY_EDITOR"
     },
     "dotrush.roslyn.projectOrSolutionFiles": [
-        "/Users/priyadarshisidhartha/Documents/GitHub/Pizza-on-top/Pizza-on-top.sln"
+        "/Users/dhruv/Documents/gameProjects/Clone pizza/Pizza-on-top/Pizza-on-top.sln"
     ],
     "dotrush.roslyn.restoreProjectsBeforeLoading": false,
     "files.exclude": {

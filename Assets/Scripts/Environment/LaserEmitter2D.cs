@@ -9,12 +9,11 @@ namespace PizzaOnTop.Environment
         [SerializeField] private GameObject laserBeamPrefab;                      // Laser beam projectile prefab
         [SerializeField] private Vector2 nozzleOffset = new Vector2(0.5f, 0f);     // Nozzle tip position offset
 
-        [Header("Shooting Interval & Target Tracking")]
-        [SerializeField] private float fireRateInterval = 1.2f;                   // Time between laser shots (sec)
-        [SerializeField] private bool targetPlayer = true;                         // Rotates nozzle to track player
-        [SerializeField] private float targetingRange = 25f;                       // Max range to detect and fire at player
-        [SerializeField] private float rotationSpeed = 90f;                        // Aim rotation speed
-        [SerializeField] private bool requirePlayerInRangeToFire = true;           // ONLY shoots when player is in range!
+        [Header("Shooting & Range Mode Settings")]
+        [SerializeField] private float fireRateInterval = 1.2f;                           // Time between laser shots (sec)
+        [Tooltip("Check this to ONLY fire when player is inside detectionRange. Uncheck to fire continuously all the time!")]
+        [SerializeField] private bool onlyFireWhenPlayerInRange = false;                  // Checkbox: Range-based vs Continuous firing mode
+        [SerializeField] private float detectionRange = 25f;                               // Max range to detect player if range check is enabled
 
         [Header("Destructible Machine Settings")]
         [SerializeField] private bool isDestructible = true;
@@ -47,18 +46,10 @@ namespace PizzaOnTop.Environment
         {
             if (isDestroyed) return;
 
-            bool isPlayerInArea = IsPlayerInTargetingRange();
-
-            // 1. Aim Nozzle Towards Player when in range
-            if (targetPlayer && isPlayerInArea)
-            {
-                AimAtPlayer();
-            }
-
-            // 2. Fire Laser Beam when player is in targeting range!
+            // Fire Laser Beam along fixed machine nozzle direction (transform.right)
             if (Time.time >= nextFireTime)
             {
-                if (!requirePlayerInRangeToFire || isPlayerInArea)
+                if (!onlyFireWhenPlayerInRange || IsPlayerInTargetingRange())
                 {
                     FireLaserBeam();
                     nextFireTime = Time.time + fireRateInterval;
@@ -76,18 +67,7 @@ namespace PizzaOnTop.Environment
             }
 
             float dist = Vector2.Distance(transform.position, playerTransform.position);
-            return dist <= targetingRange;
-        }
-
-        private void AimAtPlayer()
-        {
-            if (playerTransform == null) return;
-
-            Vector2 dirToPlayer = (playerTransform.position - transform.position).normalized;
-            float targetAngle = Mathf.Atan2(dirToPlayer.y, dirToPlayer.x) * Mathf.Rad2Deg;
-
-            Quaternion targetRotation = Quaternion.AngleAxis(targetAngle, Vector3.forward);
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            return dist <= detectionRange;
         }
 
         public void FireLaserBeam()
@@ -97,7 +77,7 @@ namespace PizzaOnTop.Environment
             Vector2 spawnPos = (Vector2)transform.position + (Vector2)(transform.rotation * nozzleOffset);
             Instantiate(laserBeamPrefab, spawnPos, transform.rotation);
 
-            Debug.Log("[LaserEmitter2D] Fired targeted laser beam blast!");
+            Debug.Log("[LaserEmitter2D] Fired laser beam blast!");
         }
 
         public void TakeDamage(int damage = 1)
@@ -132,10 +112,10 @@ namespace PizzaOnTop.Environment
             Gizmos.DrawWireSphere(nozzlePos, 0.1f);
             Gizmos.DrawRay(nozzlePos, transform.right * 3f);
 
-            if (targetPlayer)
+            if (onlyFireWhenPlayerInRange)
             {
                 Gizmos.color = Color.red;
-                Gizmos.DrawWireSphere(transform.position, targetingRange);
+                Gizmos.DrawWireSphere(transform.position, detectionRange);
             }
         }
     }

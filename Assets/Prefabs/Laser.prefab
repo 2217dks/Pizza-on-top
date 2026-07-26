@@ -153,11 +153,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PizzaOnTop.Environment.LaserEmitter2D
   laserBeamPrefab: {fileID: 1241298356172820760, guid: 0d8bed89289624cae87283d3c011377b, type: 3}
   nozzleOffset: {x: 0.88, y: 0}
-  fireRateInterval: 1.2
-  targetPlayer: 1
-  targetingRange: 15
-  rotationSpeed: 90
-  requirePlayerInRangeToFire: 1
+  fireRateInterval: 1
+  onlyFireWhenPlayerInRange: 1
+  detectionRange: 15
   isDestructible: 1
   maxHealth: 3
   destroyedSprite: {fileID: 0}

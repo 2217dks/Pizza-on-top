@@ -73,6 +73,9 @@ namespace PizzaOnTop.Environment
 
         private void OnTriggerStay2D(Collider2D other)
         {
+            // Ignore laser beams completely so wind fans do not affect laser beam flight
+            if (other.GetComponent<LaserBeam2D>() != null) return;
+
             Vector2 windVector = GetWindVector();
 
             // Calculate effective force compensating for gravity on vertical updrafts

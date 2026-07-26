@@ -3,96 +3,98 @@
 ## 1. Game Overview
 - **Title**: Pizza On Top
 - **Genre**: 2D Side-Scrolling Vertical Platformer / Metroidvania
-- **Art Style**: 2D Pixel Art (Tilemaps, Rule Tiles, Pixel-perfect Camera)
-- **Controls**: Unity New Input System (`UnityEngine.InputSystem`) with primary Keyboard & Mouse support (`Space` / `Up Arrow` to jump; `A` / `D` or `Left` / `Right` to move; `E` to interact/door/carry box; `F` or Left Click to fire gun).
+- **Art Style**: 2D Pixel Art (Tilemaps, Rule Tiles, Retro CRT Post-Processing, Pixel-Perfect Camera)
+- **Controls**:
+  - `Space` / `Up Arrow` — Jump
+  - `A` / `D` or `Left` / `Right` — Move
+  - `E` — Interact (Tutorial boards, pick up / drop push box)
+  - `F` / `Left Mouse Click` — Fire weapon (unlocked after collecting key)
+  - `Left Shift` / `Left Mouse Click` — Grab & swing on ropes
 - **Core Loop**: Deliver a fresh pizza to the customer waiting on the building roof (Floors 1 to 9) before the global countdown timer hits zero.
 
 ---
 
-## 2. Core Gameplay Mechanics & Hazards
+## 2. Core Gameplay Mechanics & Architecture
 
-### ⏱️ Global Countdown Timer & Progress Penalty
-- A single overall timer (e.g. 5:00 minutes) governs the entire run across all 7–9 building floors.
-- **Death & Trap Rule**: No artificial time point deductions are taken on respawn. Instead, **the timer continues running continuously**, so falling down or dying forces you to redo parkour sections, losing valuable time naturally!
-
-### 💀 Death Animation & Respawn Delay (`respawnDelayTime = 1.0s`)
-- `PlayerController2D.cs` now exposes **`respawnDelayTime`** in the Inspector (Default: `1.0s`).
-- When player dies, the character immediately stops, plays the `Hurt`/`Dead` animation, and pauses for `1.0` second so you can see the death before teleporting back to spawn!
-
-### ⚡ 1. Laser Beam Hazards & Destructible Emitters (`LaserEmitter2D.cs`, `LaserBeam2D.cs`)
-- **Reliable Range Detection (`targetingRange = 25f`)**: The laser machine aims and shoots laser blasts smoothly whenever the player is within range.
-- **Gizmos Clean Selection**: Switched to `OnDrawGizmosSelected()` across all scripts to eliminate Unity Editor `Screen position out of view frustum` warnings!
-- **Lifetime-Limited Laser Blast Beam (`LaserBeam2D.cs`)**:
-  - Automatically destroys itself after `beamLifetime = 2.5s` if it touches nothing.
-  - When the beam touches **ANY obstacle, wall, floor, or push box**, **ONLY the beam GameObject destroys itself on impact**, leaving environment objects completely safe and intact!
-  - When the beam hits the `Player`, it triggers `player.RespawnPlayer()` and destroys itself.
-- **Horizontal Beam Sprite Alignment**: The laser beam sprite is stretched **horizontally** along the X-axis (`transform.right`) so it flies head-first towards the player!
-- **Shooting Interval (`fireRateInterval = 1.2s`)**: Machine periodically shoots laser beam blasts.
-- **Destructible Machine Target**: Machine takes 3 hits from gun bullets (or box impacts) and breaks permanently!
-
-### 📍 Auto-Spawning Player System (`SpawnPoint.cs`)
-- **Auto-Player Spawning (`autoSpawnIfMissing = true`)**: `SpawnPoint.cs` checks if a `Player` exists in the scene. If missing, it automatically instantiates `Player.prefab` at the `SpawnPoint` location (`transform.position`)!
-
-### 🧱 Serpentine (Zig-Zag) Floor Progression & 16-Unit Camera Y-Snapping
-- All 9 building floors are stacked vertically in a single Unity scene.
-- **Floor Height**: Each floor is **16 units high** (Camera Orthographic Size `8`).
-  - **Floor 1** (`Y = 0` to `16`): Start Left $\rightarrow$ Navigate Right $\rightarrow$ Exit Door on far Right.
-  - **Floor 2** (`Y = 16` to `32`): Spawn on Far Right (directly above Floor 1 exit) $\rightarrow$ Navigate Left $\rightarrow$ Exit Door on far Left.
-  - **Floor 3** (`Y = 32` to `48`): Spawn on Far Left (directly above Floor 2 exit) $\rightarrow$ Navigate Right $\rightarrow$ Exit Door on far Right.
+### 🧱 1. Single Continuous Level Scene (`Level.unity`) & Serpentine Floor Progression
+- **Single Vertical Scene Architecture**: All building floors are stacked vertically inside a single scene (`Assets/Scenes/Level.unity`), eliminating multi-scene loading delays.
+- **16-Unit Floor Height**: Each floor is **16 units high** (Camera Orthographic Size `8`).
+  - **Floor 1** (`Y = 0` to `16`): Start Left $\rightarrow$ Navigate Right $\rightarrow$ Ascend to Floor 2.
+  - **Floor 2** (`Y = 16` to `32`): Spawn Right $\rightarrow$ Navigate Left $\rightarrow$ Ascend to Floor 3.
+  - **Floor 3** (`Y = 32` to `48`): Spawn Left $\rightarrow$ Navigate Right $\rightarrow$ Ascend to Floor 4.
   - Continues in a serpentine zig-zag pattern up to the Roof Delivery Goal on Floor 9!
-- **Automatic Floor Camera Y-Snapping (`CameraController2D.cs`)**:
-  - Automatically calculates `currentFloorIndex = Mathf.FloorToInt(player.y / 16f)`.
-  - Centers camera Y at `(currentFloorIndex * 16) + 8` (Floor 1 = `Y 8`, Floor 2 = `Y 24`, Floor 3 = `Y 40`).
-  - Smoothly slides vertically when entering doors to frame the new floor perfectly!
+- **Floor Manager (`FloorManager.cs`)**: Dynamically computes `CurrentFloor = Mathf.FloorToInt(playerY / 16f)`.
+- **Automatic Camera Y-Snapping (`CameraController2D.cs`)**:
+  - Snaps camera Y-center to `(currentFloorIndex * 16) + 8` with smooth dampening.
+  - Optional horizontal bounds (`minXBounds`, `maxXBounds`) to prevent out-of-bounds camera view.
 
-### 🧗 2. 120° Free Rotation Elastic Rope Physics (`PlayerRopeSwing.cs`, `Rope.cs`, `RopeSegment.cs`)
-- **Edit Mode Scene View Visibility (`[ExecuteAlways]` + `EditorApplication.delayCall`)**: Ropes automatically generate and render their 3 segments directly in Scene View while designing levels in Edit Mode without any `OnValidate` warnings or errors!
-- **Exact Tip-to-Tip HingeSockets**:
-  - `Anchor` (This Segment): Top tip `(0, +halfHeight)`.
-  - `Connected Anchor` (Previous Segment): Bottom tip `(0, -halfHeight)`.
-  - Guarantees 3 segments connect seamlessly with zero gaps, zero overlaps, and zero physics stretching!
-- **Non-Solid Trigger Colliders (`isTrigger = true`)**: `Rope.cs` and `RopeSegment.cs` force all segment colliders to be triggers so the player passes smoothly through the rope without physical collision bumping or blocking!
-- **360° Top Ceiling Anchor**: Top joint rotates 360 degrees freely (`allowFull360TopAnchor = true`) for full loop swings!
-- **120° Free Rotation Arc (-60° to +60°)**: Inner joints rotate completely freely within a 120-degree arc with zero resistance.
-- **Strict Launch Velocity Clamping**: `DetachFromRope()` clamps segment velocity to `maxLaunchSpeed = 16f` before applying multipliers, guaranteeing smooth launches even inside intense wind fields!
-- **Body Center Snapping**: Calculates the exact body/grab center (`GetCenterPosition()`) and snaps the **hands/chest** directly onto the rope handle.
+### ⏱️ 2. Global Countdown Timer & Death Rules (`TimerManager.cs`)
+- A continuous timer (e.g. 5:00 minutes) governs the entire run across all building floors.
+- **No Direct Point Deduction**: The timer runs continuously in real-time. Dying forces you to redo parkour sections, losing time naturally!
+- **Timer Pause during Tutorials**: Interacting with tutorial signboards pauses the timer until the reader closes the popup.
 
-### 💨 3. Wind Fan System (`WindFan2D.cs`)
-- Directional wind force fields supporting Updrafts (`Up`), Horizontal Wind Resistance (`Left` / `Right`), and custom angles.
-- **Default Settings**: `windForce = 6`, `verticalWindMultiplier = 8`, `maxSpeedInWind = 10`.
-- **Vertical Gravity Compensation**: Automatically balances gravity for vertical updrafts.
-- **Active Movement Integration**: `PlayerController2D.cs` integrates `ActiveWindVelocity` directly into `FixedUpdate()` target speed calculation `(moveInput * moveSpeed) + ActiveWindVelocity.x`.
-- **Inspector Area Controls**: Exposed `windAreaSize` (Width x Height) and `windAreaOffset` fields directly in the Inspector! Automatically resizes the trigger box and draws blue scene gizmos for instant visual range tuning.
+### 💀 3. Death Animation & Respawn Delay (`PlayerController2D.cs`, `SpawnPoint.cs`)
+- `respawnDelayTime` exposed in Inspector (Default: `1.0s`).
+- When dying (touching hazards or laser beams), the character stops, plays `Hurt`/`Dead` animation, and pauses for `1.0s` so the player sees the death sequence.
+- Teleports the character to the active floor's `SpawnPoint` registered in `SpawnPoint.All` dictionary.
+- Automatically resets all `CrumblingTilemap2D` blocks across the scene on respawn!
 
-### 📦 4. Pushable / Overhead Carry Box & Pressure Plate (`PushBox2D.cs`, `PressurePlate2D.cs`)
-- **PushBox2D**: Physics-based push box. Walk into it to push, or press **`E`** to pick it up overhead on top of the character's head without needing custom animations! Press **`E`** again to drop or toss it forward. Modern Unity 6 `RB.bodyType` API.
-- **PressurePlate2D**: Weight-activated button plate. Triggers UnityEvents when pressed by a player or box (used for opening puzzle doors or disabling laser beams).
+### 🔊 4. Dynamic Audio System (`AudioManager.cs`)
+- Singleton pattern (`AudioManager.Instance`) persisting across scenes.
+- **Background Music**: Loops background music (`fight.ogg`) with dedicated music volume control.
+- **SFX Triggers**:
+  - Footsteps: Dynamic footstep sound selection from clips array (`footstepClips`) played on movement interval (`0.35s`).
+  - Jump & Land SFX: Played during jump execution and grounded landing impact.
+  - Death SFX: Plays `vgdeathsound.ogg` immediately when player dies.
 
-### 🔑 5. Key Collectible System (`KeyCollectible2D.cs`)
-- Special key item placed on a specific building floor.
-- Collecting the key updates persistent state in [GameManager.cs](file:///Users/dhruv/Documents/gameProjects/Pizza-on-top/Assets/Scripts/Managers/GameManager.cs) (`HasSpecialKey = true` & `IsGunUnlocked = true`).
+### 📖 5. Interactive Tutorial System (`TutorialTrigger.cs`)
+- Implements `IInteractable` interface triggered via `E` key near signboards.
+- Toggles overlay canvas (`popup`).
+- Pauses global timer (`TimerManager.Instance.PauseTimer()`) and disables player input while open.
 
-### 🔫 6. Player Gun Weapon & Bullets (`PlayerGun2D.cs`, `Bullet2D.cs`)
-- Unlocked when the special key is collected. Press **`F`** or **Left Click** to fire projectiles.
-- Destroys laser beam machines and deals damage to the roof Mini-Boss!
+### 🧗 6. 120° Free Rotation Elastic Rope Physics (`PlayerRopeSwing.cs`, `Rope.cs`, `RopeSegment.cs`)
+- **Edit Mode Scene View Rendering (`[ExecuteAlways]`)**: Ropes generate and render 3 connected segments live in Scene View.
+- **Tip-to-Tip HingeSockets**: Zero-gap connection between segment anchors.
+- **360° Top Ceiling Anchor**: Top joint rotates freely (`allowFull360TopAnchor = true`).
+- **120° Swing Arc**: Inner joints rotate within a 120-degree arc with zero resistance.
+- **Launch Velocity Cap**: Clamps detach speed to `maxLaunchSpeed = 16f` for smooth launches.
+- **Body Center Snapping**: Snaps player chest/hands cleanly onto the rope handle.
+
+### 💨 7. Directional Wind Fan System (`WindFan2D.cs`)
+- Updrafts and horizontal wind force fields with vertical gravity compensation.
+- Integrated directly into `PlayerController2D.cs` physics update loop.
+
+### ⚡ 8. Fixed-Direction Laser Emitters & Cover Blocking (`LaserEmitter2D.cs`, `LaserBeam2D.cs`)
+- **Fixed Nozzle Direction**: Laser machine targeting rotation removed. Emitter stays locked in its scene placement orientation, periodically shooting laser blasts straight along its nozzle direction (`transform.right`).
+- **Laser Blast Beam (`LaserBeam2D.cs`)**: Auto-destroys after `2.5s` lifetime or on impact with walls, push boxes, or player. Includes frame linecasting to prevent fast beam clipping.
+
+### 📦 9. Pushable / Overhead Carry Box as Laser Cover (`PushBox2D.cs`, `PressurePlate2D.cs`)
+- **Laser Cover Shield**: Walking behind a `PushBox2D` or carrying it overhead blocks incoming laser beams. The beam collides with the box and gets destroyed on impact, keeping the player behind it 100% safe.
+- **PushBox2D**: Walk into it to push, or press `E` to pick up overhead (uses `Physics2D.IgnoreCollision` to keep the collider active for laser protection). Press `E` again to drop or toss it forward.
+- **PressurePlate2D**: Weight-activated button plate triggered by player or push box.
+
+### 🔑 10. Key Collectible & Weapon System (`KeyCollectible2D.cs`, `PlayerGun2D.cs`, `Bullet2D.cs`)
+- Collecting key sets `HasSpecialKey = true` and `IsGunUnlocked = true` in `GameManager.cs`.
+- Unlocks gun weapon firing via `F` or Left Click.
 
 ---
 
-## 3. Standardized Prefabs & Level Design Workflow
+## 3. Planned Features & Development Roadmap
 
-### 📦 Drag-and-Drop Prefabs Directory (`Assets/Prefabs/`)
-- `Player.prefab` — Platformer controller, rope swing, animator, overhead box carrying socket, and gun controller.
-- `Door.prefab` — Entrance / Exit floor transition gate.
-- `SpawnPoint.prefab` — Auto-spawner arrival & respawn point.
-- `RopeSegment.prefab` — Individual physics rope segment using your custom rope sprite.
-- `Rope.prefab` — 360° top anchor elastic rope parent prefab with Edit Mode Scene View visibility.
-- `CrumblingTilemap` — Painted breakable ground traps.
-- `PushBox.prefab` — Pushable & overhead carry box.
-- `PressurePlate.prefab` — Weight button plate.
-- `KeyCollectible.prefab` — Special key item.
-- `LaserBeam.prefab` — Horizontal lifetime-limited laser blast projectile.
-- `LaserEmitter.prefab` — Destructible laser machine aiming and shooting reliably when player is in range.
-- `WindFan.prefab` — Updraft wind lift shaft with adjustable area size.
+### 🎮 Main Menu, Difficulty Selection & Credits Page
+- **Menu Scene**: Using `SampleScene.unity` or a dedicated menu scene as Scene 0 in Unity Build Settings.
+- **Difficulty Selection**:
+  - Easy / Normal / Hard modes adjusting timer length (e.g., 7:00 vs 5:00 vs 3:00) or hazard fire rates.
+- **Credits Page**: Showcase team members and asset creators.
+
+### 🚨 Endgame Delivery Failure Popup & Flow
+- **Delivery Fail Popup**: When timer hits `0:00`, trigger a dramatic Game Over popup:
+  - Text: *"You won't be able to complete the delivery!"*
+  - Controls: Press `Enter` to Restart or Return to Main Menu.
+
+### 🍕 Roof Delivery & Boss Encounter (Floor 9)
+- Final delivery location on the roof of Floor 9.
+- Mini-Boss encounter requiring bullet shooting and box throwing mechanics to reach the customer!
 
 ---
 
@@ -100,38 +102,24 @@
 
 ```
 Assets/
-├── Scripts/
-│   ├── Camera/
-│   │   └── CameraController2D.cs       # Automatic 16-unit floor Y-snapping & smooth dampening
-│   ├── Managers/
-│   │   ├── GameManager.cs              # Global game state, persistent timer, key & gun tracking
-│   │   ├── TimerManager.cs             # Persistent countdown timer across scenes
-│   │   └── LevelTransitionManager.cs   # Door scene loading & intra-scene teleportation
-│   ├── Player/
-│   │   ├── PlayerController2D.cs       # Snappy Hollow Knight jump physics & respawnDelayTime (1.0s) setting
-│   │   ├── PlayerAnimator.cs           # Sprite flipping, Player_Run direct playback, safe parameter checks
-│   │   ├── PlayerRopeSwing.cs          # Rope swing with physics force pumping & launch speed clamping
-│   │   ├── PlayerInteract.cs           # Door interaction trigger with body-center positioning
-│   │   ├── PlayerGun2D.cs              # Key-unlocked shooting weapon controller
-│   │   └── Bullet2D.cs                 # Projectile physics & obstacle/laser damage dealing
-│   ├── Environment/
-│   │   ├── Door.cs                     # Floor entrance/exit triggers (teleports to target SpawnPoint & updates floor)
-│   │   ├── SpawnPoint.cs               # Auto-player spawning & arrival locations with unique SpawnIDs
-│   │   ├── Rope.cs & RopeSegment.cs    # 360° rope with [ExecuteAlways] Edit Mode Scene View visibility
-│   │   ├── CrumblingTilemap2D.cs       # Direct foot cell sampling crumbling tilemaps with matrix shaking
-│   │   ├── WindFan2D.cs                # Updraft & horizontal wind force field shafts
-│   │   ├── PushBox2D.cs                # Pushable & overhead carry box (RB.bodyType API)
-│   │   ├── PressurePlate2D.cs          # Weight-activated button plate
-│   │   ├── KeyCollectible2D.cs         # Special key item pick-up
-│   │   ├── LaserEmitter2D.cs           # Reliable laser machine aiming and shooting when player in range
-│   │   ├── LaserBeam2D.cs              # Horizontal lifetime-limited laser blast
-│   │   ├── Hazard2D.cs                 # Traps & pitfalls
-│   │   └── MovingPlatform2D.cs         # Moving platforms
-│   └── UI/
-│       └── HUDController.cs            # Timer HUD & Floor counter
-├── Prefabs/
+├── Animations/          # Player & Fan animation clips
+├── Audio / Sounds/      # Footsteps, Jumps, Landings, Death SFX, Background music (fight.ogg)
+├── Prefabs/             # Drag-and-drop prefabs (Player, Rope, Fan, Laser, Ground, PushBox, Key, etc.)
 ├── Scenes/
-└── Tilemaps/
+│   ├── Level.unity      # Main vertical gameplay scene (Scene 1 in Build Settings)
+│   ├── SampleScene.unity# Menu / Difficulty / Credits scene (Scene 0 in Build Settings)
+│   └── Level/           # Global Volume Profile (Retro CRT Post-Processing)
+├── Scripts/
+│   ├── Camera/          # CameraController2D.cs (16-unit Y-snapping & bounds)
+│   ├── Environment/     # FloorManager, SpawnPoint, Rope, WindFan2D, PushBox2D, PressurePlate2D,
+│   │                    # KeyCollectible2D, LaserEmitter2D, LaserBeam2D, CrumblingTilemap2D, Hazard2D
+│   ├── Managers/        # GameManager.cs, TimerManager.cs, AudioManager.cs
+│   ├── Player/          # PlayerController2D, PlayerAnimator, PlayerRopeSwing, PlayerInteract,
+│   │                    # PlayerGun2D, Bullet2D
+│   ├── Tutorial/        # TutorialTrigger.cs (Interactable UI popup)
+│   └── UI/              # HUDController.cs
+├── Settings/            # InputSystem_Actions, URP Global Settings
+└── tiles / backgrounds/ # Industrial pixel art tilemaps & city backgrounds
 ```
 
 ---
@@ -140,12 +128,8 @@ Assets/
 
 | Date | Phase / Feature | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| 2026-07-23 | Project Architecture & Core Design | ✅ Completed | Created C# script specifications, persistent timer rules, physics rope swing, door transitions, and design doc sync. |
-| 2026-07-23 | Core C# Scripts Implementation | ✅ Completed | Created all C# scripts (`TimerManager`, `GameManager`, `LevelTransitionManager`, `PlayerController2D`, `PlayerInteract`, `Door`, `SpringPad2D`, `MovingPlatform2D`, `HUDController`). |
-| 2026-07-25 | Out-of-Frustum Gizmos Clean Fix | ✅ Completed | Updated `LaserEmitter2D.cs` & `SpawnPoint.cs` to use `OnDrawGizmosSelected()`, resolving Unity Editor `Screen position out of view frustum` GUI warnings. |
-
----
-
-## 6. Where We Left Off
-- **Current Task**: Updated Gizmos to OnDrawGizmosSelected resolving Unity Editor out-of-frustum warning.
-- **Next Steps**: Level building!
+| 2026-07-23 | Project Architecture & Core Design | ✅ Completed | Created initial C# specifications and mechanics outline. |
+| 2026-07-23 | Core C# Scripts Implementation | ✅ Completed | Implemented movement, jump physics, rope swing, and hazard mechanics. |
+| 2026-07-25 | Out-of-Frustum Gizmos Clean Fix | ✅ Completed | Switched to `OnDrawGizmosSelected()` across scripts resolving editor warnings. |
+| 2026-07-26 | Single-Scene Architecture & Systems | ✅ Completed | Stacked floors in `Level.unity`, added `FloorManager.cs`, `AudioManager.cs`, `TutorialTrigger.cs`, and CRT post-processing. |
+| 2026-07-26 | Build Settings & SpawnPoint Cleanup | ✅ Completed | Synchronized `EditorBuildSettings.asset` (adding `Level.unity`), cleaned spawn point naming in `Level.unity`. |
