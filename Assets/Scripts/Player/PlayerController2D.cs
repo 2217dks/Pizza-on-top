@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using PizzaOnTop.Environment;
+using PizzaOnTop.Managers;
 
 namespace PizzaOnTop.Player
 {
@@ -48,6 +49,8 @@ namespace PizzaOnTop.Player
         // Polish Timers
         private float coyoteCounter;
         private float jumpBufferCounter;
+        private float footstepTimer;
+        private float footstepInterval = 0.35f;
 
         // GC-Free Physics Buffer & Contact Filter
         private readonly Collider2D[] groundOverlapResults = new Collider2D[8];
@@ -130,6 +133,20 @@ namespace PizzaOnTop.Player
                 if (RB.linearVelocity.y <= 0.1f)
                 {
                     isJumping = false;
+                }
+
+                if (Mathf.Abs(moveInput) > 0.1f)
+                {
+                    footstepTimer -= Time.deltaTime;
+                    if (footstepTimer <= 0f)
+                    {
+                        if (AudioManager.Instance != null) AudioManager.Instance.PlayFootstep();
+                        footstepTimer = footstepInterval;
+                    }
+                }
+                else
+                {
+                    footstepTimer = 0f;
                 }
             }
             else
@@ -241,6 +258,8 @@ namespace PizzaOnTop.Player
                 RB.linearVelocity = new Vector2(RB.linearVelocity.x, jumpForce);
                 isJumping = true;
 
+                if (AudioManager.Instance != null) AudioManager.Instance.PlayJump();
+
                 if (PlayerAnim != null)
                 {
                     PlayerAnim.TriggerJumpVisual();
@@ -257,6 +276,7 @@ namespace PizzaOnTop.Player
         private IEnumerator RoutineRespawn()
         {
             IsDead = true;
+            if (AudioManager.Instance != null) AudioManager.Instance.PlayDeath();
             if (PlayerAnim != null)
             {
                 PlayerAnim.TriggerHurtVisual();

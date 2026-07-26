@@ -136,6 +136,7 @@ MonoBehaviour:
   maxUpwardSpeed: 20
   coyoteTime: 0.12
   jumpBufferTime: 0.15
+  respawnDelayTime: 1
   debugDeathKey: 107
 --- !u!114 &2289152016859939348
 MonoBehaviour:
@@ -153,7 +154,7 @@ MonoBehaviour:
   centerOffset: {x: 0, y: 1}
   interactableLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
 --- !u!114 &2791363872617695399
 MonoBehaviour:
   m_ObjectHideFlags: 0

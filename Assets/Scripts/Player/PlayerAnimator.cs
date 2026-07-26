@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using PizzaOnTop.Managers;
 
 namespace PizzaOnTop.Player
 {
@@ -119,6 +120,11 @@ namespace PizzaOnTop.Player
             }
 
             // 3. Procedural Jump & Land Squash-and-Stretch
+            if (isGrounded && !wasGroundedLastFrame && vel.y <= 0.1f)
+            {
+                if (AudioManager.Instance != null) AudioManager.Instance.PlayLand();
+            }
+
             if (useSquashAndStretch)
             {
                 if (isGrounded && !wasGroundedLastFrame && vel.y <= 0.1f)

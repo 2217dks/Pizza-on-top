@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 
 namespace PizzaOnTop.Managers
@@ -10,6 +11,8 @@ namespace PizzaOnTop.Managers
         [Header("Timer Settings")]
         [SerializeField] private float totalTimeInSeconds = 300f; // 5 minutes default
         [SerializeField] private bool autoStartTimer = true;
+
+        [SerializeField] private TextMeshProUGUI timertext;
 
         [Header("Time Penalty Settings")]
         [SerializeField] private float trapTimePenalty = 10f; // Deduct 10s on trap hit
@@ -56,8 +59,14 @@ namespace PizzaOnTop.Managers
                 IsRunning = false;
                 IsExpired = true;
                 OnTimerExpired?.Invoke();
-                Debug.Log("[TimerManager] Time's up! Pizza delivery failed!");
+                OnDeliveryFail();
             }
+            timertext.text = RemainingTime.ToString("f0");
+        }
+
+        private void OnDeliveryFail()
+        {
+
         }
 
         public void StartTimer()

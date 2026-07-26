@@ -36,9 +36,17 @@ namespace PizzaOnTop.Player
                 interactPressed = true;
             }
 
-            if (currentInteractable != null && interactPressed)
+            if (interactPressed)
             {
-                currentInteractable.Interact();
+                if (currentInteractable != null)
+                {
+                    Debug.Log($"PlayerInteract: Interacting with {currentInteractable}");
+                    currentInteractable.Interact();
+                }
+                else
+                {
+                    Debug.Log("PlayerInteract: 'E' pressed, but no interactable found in range. Check layer and collider!");
+                }
             }
         }
 
@@ -51,22 +59,25 @@ namespace PizzaOnTop.Player
             return (Vector2)transform.position + centerOffset;
         }
 
-        private void CheckInteractable()
-        {
-            Vector2 checkPos = GetCenterPosition();
-            Collider2D col = Physics2D.OverlapCircle(checkPos, interactRadius, interactableLayer);
-            if (col != null)
-            {
-                IInteractable interactable = col.GetComponent<IInteractable>();
-                if (interactable != null)
-                {
-                    currentInteractable = interactable;
-                    return;
-                }
-            }
+    private void CheckInteractable()
+    {
+        Vector2 checkPos = GetCenterPosition();
 
-            currentInteractable = null;
+        Collider2D[] hits = Physics2D.OverlapCircleAll(checkPos, interactRadius);
+
+        foreach (var hit in hits)
+        {
+            IInteractable interactable = hit.GetComponent<IInteractable>();
+
+            if (interactable != null)
+            {
+                currentInteractable = interactable;
+                return;
+            }
         }
+
+        currentInteractable = null;
+    }
 
         public IInteractable GetCurrentInteractable() => currentInteractable;
 
