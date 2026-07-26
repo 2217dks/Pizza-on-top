@@ -1,6 +1,10 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
+using PizzaOnTop.Player;
+using System.Globalization;
 
 namespace PizzaOnTop.Managers
 {
@@ -13,6 +17,10 @@ namespace PizzaOnTop.Managers
         [SerializeField] private bool autoStartTimer = true;
 
         [SerializeField] private TextMeshProUGUI timertext;
+
+        [SerializeField] private GameObject gameOverScreen;
+
+        [SerializeField] private InputActionReference restartAction;
 
         [Header("Time Penalty Settings")]
         [SerializeField] private float trapTimePenalty = 10f; // Deduct 10s on trap hit
@@ -34,8 +42,19 @@ namespace PizzaOnTop.Managers
             }
 
             Instance = this;
-            DontDestroyOnLoad(gameObject);
             RemainingTime = totalTimeInSeconds;
+        }
+
+        private void OnEnable()
+        {
+            restartAction.action.Enable();
+            restartAction.action.performed += OnRestartAction;
+        }
+
+        private void OnDisable()
+        {
+            restartAction.action.performed -= OnRestartAction;
+            restartAction.action.Disable();
         }
 
         private void Start()
@@ -44,6 +63,11 @@ namespace PizzaOnTop.Managers
             {
                 StartTimer();
             }
+        }
+
+        private void OnRestartAction(InputAction.CallbackContext context)
+        {
+            Restart();
         }
 
         private void Update()
@@ -66,7 +90,33 @@ namespace PizzaOnTop.Managers
 
         private void OnDeliveryFail()
         {
+            gameOverScreen.SetActive(true);
+            
+            PlayerController2D player = FindAnyObjectByType<PlayerController2D>();
+            if (player != null)
+            {
+                player.SetVelocity(Vector2.zero);
+                player.enabled = false;
+                if (player.gameObject.GetComponent<PlayerInteract>() != null)
+                {
+                    player.gameObject.GetComponent<PlayerInteract>().enabled = false;
+                }
+            }
+        }
 
+        public void Restart()
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
+
+        public void Home()
+        {
+            SceneManager.LoadScene(0);
+        }
+
+        public void Credits()
+        {
+            SceneManager.LoadScene(2);
         }
 
         public void StartTimer()

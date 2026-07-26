@@ -7,6 +7,6 @@
 
     <!-- Auto-generated: Point MSBuild to Unity's bundled reference assemblies
          so DotRush can compile without Mono or .NET Framework SDK -->
-    <FrameworkPathOverride>/Applications/Unity/Hub/Editor/6000.3.18f1/Unity.app/Contents/Resources/Scripting/UnityReferenceAssemblies/unity-4.8-api</FrameworkPathOverride>
+    <FrameworkPathOverride>/Applications/Unity/Hub/Editor/6000.3.11f1/Unity.app/Contents/Resources/Scripting/UnityReferenceAssemblies/unity-4.8-api</FrameworkPathOverride>
   </PropertyGroup>
 </Project>
