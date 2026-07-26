@@ -26,6 +26,7 @@ public class TutorialTrigger : MonoBehaviour, IInteractable
 
     public void Interact()
     {
+        player = FindAnyObjectByType<PlayerController2D>();
         Debug.Log("Tutorial opened");
 
         open = !open;
